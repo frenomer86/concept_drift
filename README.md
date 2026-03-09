@@ -1,19 +1,21 @@
-# Concept Drift in Encrypted Traffic: DART+AGIL (Regenerated, Binary-Safe)
+# Concept Drift in Encrypted Traffic: DART+AGIL (Complete Experiment Pipeline)
 
 This repository provides a reproducible implementation for encrypted-traffic malicious flow detection under temporal drift.
 
-## What is implemented
-- Real dataset handling (NSL-KDD auto-download, CIC-style CSV ingestion)
-- Temporal train/val/test splits
-- DART+AGIL model and ablations (`full`, `no_dart`, `no_agil`, `no_online_tl` config hook)
-- Baseline models (LogReg, RandomForest, MLP, IF-DR)
-- Obfuscation evaluation (IDP/IBP/APR/INP)
-- Few-shot evaluation
-- Metric export tables and PDF pattern-filled bar plots (no color)
+## Implemented scope
+- Proposed method: DART+AGIL (`full`) plus ablations (`no_dart`, `no_agil`, `no_online_tl` config variant)
+- Baselines: Logistic Regression, Random Forest, MLP, IF-DR
+- Evaluations: clean performance, obfuscation robustness (IDP/IBP/APR/INP), few-shot, drift-rate summary
+- Metrics: Accuracy, Precision, Recall, F1, ROC-AUC, ECE
+- Outputs: automatic tables and PDF figures (pattern-filled, no color)
+
+## Dataset handling
+- NSL-KDD auto-download is implemented.
+- CICIDS2017/CICDDoS2019 may require manual placement due source access restrictions.
 
 ## Binary-safe policy
 - `.gitignore` excludes `__pycache__`, `*.pyc`, outputs, and data.
-- The repository intentionally avoids tracked binary artifacts.
+- No binary artifacts should be committed.
 
 ## Quickstart
 ```bash
@@ -23,9 +25,15 @@ pip install -e .
 python scripts/run_pipeline.py --config configs/default.json
 ```
 
-## Outputs
+## Generated artifacts
 - `outputs/tables/metrics_all.csv`
-- `outputs/tables/fewshot.csv` (if generated)
-- `outputs/tables/drift.csv` (if generated)
-- `outputs/figures/*.pdf`
+- `outputs/tables/clean_metrics.csv`
+- `outputs/tables/table_clean_summary.csv`
+- `outputs/tables/table_obfuscation_degradation.csv`
+- `outputs/tables/table_ablation.csv`
+- `outputs/tables/table_fewshot.csv` (if few-shot rows exist)
+- `outputs/tables/table_drift.csv` (if drift rows exist)
+- `outputs/figures/clean_*.pdf`
+- `outputs/figures/fewshot_*.pdf`
+- `outputs/figures/drift_rate_*.pdf`
 - `outputs/logs/run_summary.json`

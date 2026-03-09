@@ -30,7 +30,7 @@ from concept_drift.training.trainer import fit
 from concept_drift.eval.metrics import classification_metrics
 from concept_drift.eval.fewshot import fewshot_scores
 from concept_drift.eval.obfuscation import apply_idp, apply_ibp, apply_apr, apply_inp
-from concept_drift.eval.plots import pattern_barplot
+from concept_drift.eval.reporting import export_all_reports
 
 
 def infer_probs_torch(model, X, device):
@@ -158,11 +158,12 @@ def main(config_path: str):
     if drift_rows:
         pd.DataFrame(drift_rows).to_csv(out / "tables" / "drift.csv", index=False)
 
-    # Plot: clean F1 by model for first dataset
-    first_ds = metrics_df["dataset"].iloc[0]
-    clean = metrics_df[(metrics_df["dataset"] == first_ds) & (metrics_df["scenario"] == "clean")]
-    f1_vals = {row.model: float(row.f1) for row in clean.itertuples()}
-    pattern_barplot(f1_vals, f"Clean F1 ({first_ds})", "F1", out / "figures" / "clean_f1_by_model.pdf")
+    export_all_reports(
+        metrics_df=metrics_df,
+        fewshot_df=(pd.DataFrame(fewshot_rows) if fewshot_rows else None),
+        drift_df=(pd.DataFrame(drift_rows) if drift_rows else None),
+        out_dir=out,
+    )
 
     write_json(out / "logs" / "run_summary.json", {
         "datasets_processed": sorted(metrics_df["dataset"].unique().tolist()),
