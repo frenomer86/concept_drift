@@ -37,3 +37,7 @@ python scripts/run_pipeline.py --config configs/default.json
 - `outputs/figures/fewshot_*.pdf`
 - `outputs/figures/drift_rate_*.pdf`
 - `outputs/logs/run_summary.json`
+
+
+## Jupyter notebook (single complete file)
+- `notebooks/complete_dart_agil_pipeline.ipynb` contains full end-to-end code in one notebook: downloads, preprocessing, proposed model, baselines, metrics, ablations, tables, and PDF plots.
