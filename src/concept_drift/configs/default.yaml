@@ -1,0 +1,78 @@
+seed: 42
+output_dir: outputs
+
+datasets:
+  root_dir: data
+  cicids2017:
+    enabled: true
+    sources:
+      - url: "https://raw.githubusercontent.com/ahlashkari/CICFlowMeter/master/src/main/resources/CICIDS2017/MachineLearningCSV.zip"
+        filename: "cicids2017_ml.zip"
+    target_col: "Label"
+    timestamp_col: "Timestamp"
+  cicddos2019:
+    enabled: true
+    sources:
+      - url: "https://www.unb.ca/cic/datasets/ddos-2019.html"
+        filename: "cicddos2019_info.html"
+    target_col: "Label"
+    timestamp_col: "Timestamp"
+  nsl_kdd:
+    enabled: true
+    sources:
+      - url: "https://raw.githubusercontent.com/defcom17/NSL_KDD/master/KDDTrain+.txt"
+        filename: "KDDTrain+.txt"
+      - url: "https://raw.githubusercontent.com/defcom17/NSL_KDD/master/KDDTest+.txt"
+        filename: "KDDTest+.txt"
+    target_col: "label"
+    timestamp_col: "_pseudo_time"
+
+preprocessing:
+  max_rows_per_dataset: null
+  dropna: true
+  scale: standard
+  temporal_split:
+    train: 0.70
+    val: 0.15
+    test: 0.15
+
+features:
+  selected:
+    - Flow Duration
+    - Total Fwd Packets
+    - Total Backward Packets
+    - Total Length of Fwd Packets
+    - Total Length of Bwd Packets
+    - Fwd Packet Length Mean
+    - Bwd Packet Length Mean
+    - Flow Bytes/s
+    - Flow Packets/s
+    - Flow IAT Mean
+    - Flow IAT Std
+
+training:
+  epochs: 15
+  batch_size: 256
+  learning_rate: 0.0001
+  weight_decay: 0.0001
+  latent_dim: 128
+  lambda_agil: 0.5
+  delta_eps: 0.03
+  adv_steps: 3
+  early_stopping_patience: 5
+
+baselines:
+  random_forest:
+    n_estimators: 400
+    max_depth: null
+  mlp:
+    hidden_layer_sizes: [256, 128]
+    learning_rate_init: 0.001
+    max_iter: 200
+  logistic_regression:
+    max_iter: 1000
+
+plots:
+  style: default
+  hatch_patterns: ["/", "\\", "|", "-", "+", "x", "o", "O", ".", "*"]
+  format: pdf
