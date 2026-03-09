@@ -3,8 +3,15 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 import time
 from pathlib import Path
+
+# Allow running the script directly without installing the package.
+ROOT = Path(__file__).resolve().parents[1]
+SRC = ROOT / "src"
+if str(SRC) not in sys.path:
+    sys.path.insert(0, str(SRC))
 
 import numpy as np
 import pandas as pd
