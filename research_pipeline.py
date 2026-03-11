@@ -139,15 +139,42 @@ def save_heatmap(df: pd.DataFrame, title: str, out_pdf: Path):
 
 
 def find_label_column(df: pd.DataFrame) -> str:
-    candidates = ["Label", "label", "Class", "class", "Attack", "attack", "Category", "category"]
-    for c in candidates:
-        if c in df.columns:
-            return c
-    lower = {c.lower(): c for c in df.columns}
-    for c in candidates:
-        if c.lower() in lower:
-            return lower[c.lower()]
-    raise AssertionError("Label column not found")
+    columns = [str(c).strip() for c in df.columns]
+    lower_map = {c.lower(): c for c in columns}
+
+    exact_candidates = [
+        "label", "class", "attack", "category", "target", "y", "is_attack", "malicious",
+        "attack_cat", "attack_type", "traffic_type",
+    ]
+    for c in exact_candidates:
+        if c in lower_map:
+            return lower_map[c]
+
+    keyword_candidates = ["label", "class", "attack", "category", "malicious", "target", "traffic"]
+    for col in columns:
+        low = col.lower()
+        if any(k in low for k in keyword_candidates):
+            return col
+
+    non_numeric = [c for c in columns if not pd.api.types.is_numeric_dtype(df[c])]
+    non_numeric = [c for c in non_numeric if df[c].nunique(dropna=True) > 1]
+    bounded_non_numeric = [c for c in non_numeric if df[c].nunique(dropna=True) <= 200]
+    if bounded_non_numeric:
+        bounded_non_numeric.sort(key=lambda c: (df[c].nunique(dropna=True), c))
+        return bounded_non_numeric[0]
+
+    numeric_candidates = [
+        c for c in columns
+        if pd.api.types.is_numeric_dtype(df[c]) and 1 < df[c].nunique(dropna=True) <= 50
+    ]
+    keyword_numeric = [c for c in numeric_candidates if any(k in c.lower() for k in keyword_candidates)]
+    if keyword_numeric:
+        return keyword_numeric[0]
+    if numeric_candidates:
+        numeric_candidates.sort(key=lambda c: (df[c].nunique(dropna=True), c))
+        return numeric_candidates[0]
+
+    raise AssertionError(f"Label column not found. Available columns (first 20): {columns[:20]}")
 
 
 def to_binary_labels(series: pd.Series) -> np.ndarray:
@@ -160,10 +187,13 @@ def preprocess_dataset(path: Path, dataset_name: str) -> pd.DataFrame:
     assert path.exists(), f"Dataset file not found: {path}"
     logger.info("Loading %s from %s", dataset_name, path)
     df = pd.read_csv(path, low_memory=False)
+    df.columns = [str(c).strip() for c in df.columns]
     if len(df) > CFG.max_rows:
         df = df.iloc[:CFG.max_rows].copy()
 
-    y = to_binary_labels(df[find_label_column(df)])
+    label_col = find_label_column(df)
+    logger.info("%s label column detected: %s", dataset_name, label_col)
+    y = to_binary_labels(df[label_col])
     X = df.select_dtypes(include=[np.number]).replace([np.inf, -np.inf], np.nan)
     X = X.dropna(axis=1, thresh=int(0.8 * len(X)))
     X = X.fillna(X.median(numeric_only=True))
