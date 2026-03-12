@@ -22,6 +22,7 @@ Tables:
 """
 
 import logging
+import copy
 import random
 import time
 from dataclasses import dataclass
@@ -528,7 +529,9 @@ def memory_mb(method, model):
         return sum(p.numel() * p.element_size() for p in model.parameters()) / (1024 ** 2)
     if method == "CBR":
         return (model.x.nbytes + model.y.nbytes) / (1024 ** 2)
-    return 0.0
+    # Approximate sklearn-model memory from serialized size (real fitted object size)
+    import pickle
+    return len(pickle.dumps(model, protocol=pickle.HIGHEST_PROTOCOL)) / (1024 ** 2)
 
 
 def run_dataset(name: str, frame: pd.DataFrame):
@@ -632,8 +635,8 @@ def aggregate_and_save(all_out: Dict[str, Dict]):
         drift_tbl[f"{ds} Drifted F1"] = all_out[ds]["drift"]["Drifted F1"]
     save_table(drift_tbl, "drift_adaptation")
 
-    # 2) obfuscation_results_detailed table (mean across datasets)
-    obf_tbl = sum([all_out[d]["obf"] for d in all_out]) / len(all_out)
+    # 2) obfuscation_results_detailed table (reported on CICIDS2017, no synthetic aggregation)
+    obf_tbl = all_out["CICIDS2017"]["obf"].copy()
     save_table(obf_tbl, "obfuscation_results_detailed")
 
     # 3) fewshot_results_detailed table
@@ -702,6 +705,36 @@ def aggregate_and_save(all_out: Dict[str, Dict]):
     save_bw_bars(ab_tbl[["Initial F1", "Drifted F1", "IDP (30%)", "IBP (50%)", "APR", "INP"]], "Ablation Contribution", "F1", CFG.figures / "ablation_contribution.pdf")
 
 
+def compute_fewshot_f1_for_model(model: DARTAGIL, x_train: np.ndarray, y_train: np.ndarray, x_test: np.ndarray, y_test: np.ndarray, repeats: int = 10) -> float:
+    pos = np.where(y_train == 1)[0]
+    neg = np.where(y_train == 0)[0]
+    vals = []
+    for r in range(repeats):
+        rng = np.random.default_rng(SEED + 1000 + r)
+        ip = rng.choice(pos, size=min(5, len(pos)), replace=False)
+        ineg = rng.choice(neg, size=min(5, len(neg)), replace=False)
+        idx = np.hstack([ip, ineg])
+        xk, yk = x_train[idx], y_train[idx]
+
+        m = copy.deepcopy(model).to(DEVICE)
+        dl = DataLoader(TabularDataset(xk, yk), batch_size=min(10, len(xk)), shuffle=True)
+        opt = optim.Adam(m.parameters(), lr=CFG.lr * 0.5)
+        ce = nn.CrossEntropyLoss()
+        mse = nn.MSELoss()
+        m.train()
+        for xb, yb in dl:
+            xb, yb = xb.to(DEVICE), yb.to(DEVICE)
+            opt.zero_grad()
+            logits, recon, mu, logvar, _ = m(xb)
+            loss = ce(logits, yb) + 0.1 * kl(mu, logvar) + mse(recon, xb)
+            loss.backward()
+            opt.step()
+
+        p, _, _ = predict_dart(m, x_test)
+        vals.append(f1_score(y_test, p, zero_division=0))
+    return float(np.mean(vals))
+
+
 def run_ablation(frame: pd.DataFrame):
     tr_df, va_df, te_df = temporal_split(frame)
     feats = [c for c in frame.columns if c not in ["label", "dataset"]]
@@ -742,6 +775,7 @@ def run_ablation(frame: pd.DataFrame):
         papr, _, _ = predict_dart(m, apply_obfuscation(x_test, "APR", 0.50))
         pinp, _, _ = predict_dart(m, apply_obfuscation(x_test, "INP", 0.50))
 
+        fewshot_f1 = compute_fewshot_f1_for_model(m, x_train, y_train, x_test, y_test, repeats=8)
         rows[name] = {
             "Initial F1": f1_score(y_test[:mid], p0, zero_division=0),
             "Drifted F1": f1_score(y_test[mid:], p1, zero_division=0),
@@ -749,7 +783,7 @@ def run_ablation(frame: pd.DataFrame):
             "IBP (50%)": f1_score(y_test, pibp, zero_division=0),
             "APR": f1_score(y_test, papr, zero_division=0),
             "INP": f1_score(y_test, pinp, zero_division=0),
-            "Few-Shot (N=5)": f1_score(y_test, p1, zero_division=0),
+            "Few-Shot (N=5)": fewshot_f1,
             "Update Time (ms)": upd,
         }
     return pd.DataFrame(rows).T
